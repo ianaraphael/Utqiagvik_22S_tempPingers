@@ -64,7 +64,7 @@ public:
   // automatically once object goes out of scope)
   ~TempSensors() {
 
-    // deallocate the address array
+    // // deallocate the address array
     delete [] addresses;
     // zero out the address
     addresses = 0;
@@ -120,8 +120,8 @@ public:
         Serial.print("Couldn't find sensor at index ");
         Serial.println(Serial.print(i));
       }
-      Serial.print("Sensor address: ");
-      Serial.println(*addresses[i],HEX);
+      // Serial.print("Sensor address: ");
+      // Serial.println(*addresses[i],HEX);
     }
 
     // now create the data filename
@@ -260,31 +260,19 @@ void init_SD(){
   delay(100);
   // set SS pins high for turning off radio
   pinMode(RADIO_PIN, OUTPUT);
-  delay(50);
+  delay(500);
   digitalWrite(RADIO_PIN, HIGH);
-  delay(50);
+  delay(500);
   pinMode(SD_CS, OUTPUT);
-  delay(50);
+  delay(500);
   digitalWrite(SD_CS, LOW);
-  delay(100);
+  delay(1000);
   SD.begin(SD_CS);
-  delay(200);
+  delay(2000);
   if (!SD.begin(SD_CS)) {
     Serial.println("initialization failed!");
     while(1);
   }
-
-  //TODO: for some reason this causes program to hang, without ever entering this loop.
-  // // if the SD card is out, hold until it's back in
-  // while(!SD_CD) {
-  //   Serial.println("SD card not inserted...insert to continue");
-  //   delay(500);
-  //   Serial.print(".");
-  //   delay(500);
-  //   Serial.print(".");
-  //   delay(500);
-  //   Serial.println(".");
-  // }
 }
 
 
@@ -323,23 +311,35 @@ void alarm_one_routine() {
 
   // get a static temp sensors object. Should persist throughout program lifetime
   static TempSensors tempSensors_object = TempSensors(ONE_WIRE_BUS, TEMP_POWER, NUM_TEMP_SENSORS, STATION_ID);
-  static String filename = tempSensors_object.filename;
+  // static String filename = tempSensors_object.filename;
 
   Serial.println("Made it past temp init");
 
   // init the SD
   init_SD();
 
+  //TODO: for some reason this causes program to hang, without ever entering this loop.
+  // // if the SD card is out, hold until it's back in
+  // while(!SD_CD) {
+  //   Serial.println("SD card not inserted...insert to continue");
+  //   delay(500);
+  //   Serial.print(".");
+  //   delay(500);
+  //   Serial.print(".");
+  //   delay(500);
+  //   Serial.println(".");
+  // }
+
   Serial.println("Made it past init_SD");
 
   // if the file doesn't already exist
-  if (!SD.exists(filename)){
+  if (!SD.exists(tempSensors_object.filename)){
 
     Serial.print("Creating datafile: ");
-    Serial.println(filename);
+    Serial.println(tempSensors_object.filename);
 
     // create the file
-    File dataFile = SD.open(filename, FILE_WRITE);
+    File dataFile = SD.open(tempSensors_object.filename, FILE_WRITE);
 
     // write the header information
     // if the file is available
@@ -349,8 +349,6 @@ void alarm_one_routine() {
       for (int i=0;i<tempSensors_object.numHeaderLines;i++) {
 
         dataFile.println(tempSensors_object.headerInformation[i]);
-        // TODO: include sensor ids in metadata info
-        //TODO: ensure that we are appending data & not flushing file index if powered down
       }
 
       // close the file
@@ -411,7 +409,7 @@ void alarm_one_routine() {
   init_SD();
 
   // open the file for writing
-  File dataFile = SD.open(filename, FILE_WRITE);
+  File dataFile = SD.open(tempSensors_object.filename, FILE_WRITE);
 
   // if the file is available
   if (dataFile) {
@@ -421,7 +419,7 @@ void alarm_one_routine() {
 
     // close the file
     dataFile.close();
-    //TODO: include LED flash to indicate successful data write
+    // TODO: include LED flash to indicate successful data write
   }
 
 }
