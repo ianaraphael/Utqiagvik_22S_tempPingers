@@ -22,8 +22,9 @@ ian.th@dartmouth.edu
 const int flashChipSelect = 4;
 #define TEMP_POWER 6 // temp probe power line
 #define SD_CS 7 // SD card chip select
-#define SD_CD 10 // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
+// #define SD_CD 10 // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
 #define RADIO_PIN 5 // radio CS pin
+RTCZero rtc; // real time clock object
 
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
@@ -31,9 +32,9 @@ const int flashChipSelect = 4;
 #define SAMPLING_INTERVAL_HOUR 0 // sampling interval, in hours
 #define SAMPLING_INTERVAL_MIN 1 // sampling interval, in mins. Set to 0 for even hourly sampling
 #define SAMPLING_INTERVAL_SEC 0 // sampling interval, in secs. Set to 0 for even minutely samplin
-String filename = "test.txt"; // data file filename
+// String filename = "test.txt"; // data file filename
 
-RTCZero rtc; // real time clock object
+
 
 /*************** TempSensors class ***************/
 // define a class for the temp sensors
@@ -55,7 +56,7 @@ public:
 
   String filename = ""; // a filename for the data file
   String* headerInformation; // the header information for the data file
-  int numHeaderLines = 3;
+  int numHeaderLines = 4;
 
 
   /*************** TempSensors object destructor ***************/
@@ -98,7 +99,7 @@ public:
     stationID = station_ID;
 
     // init the address array
-    addresses = new uint8_t[num_tempSensors][8];
+    addresses = new DeviceAddress[num_tempSensors];
 
     // // and point the object's addresses attribute here
     // addresses = curr_addresses;
@@ -113,18 +114,21 @@ public:
     for (int i = 0; i < numSensors; i++) {
 
       // if error getting the address
-      if (!(this->sensors.getAddress(&addresses[i][0], i))) {
+      if (!(this->sensors.getAddress(addresses[i], i))) {
 
         // print error
         Serial.print("Couldn't find sensor at index ");
         Serial.println(Serial.print(i));
       }
+      Serial.print("Sensor address: ");
+      Serial.println(*addresses[i],HEX);
     }
 
     // now create the data filename
-    filename += "station_";
+    filename += "stn";
     filename += stationID;
-    filename += "_tempArray.txt";
+    filename += ".txt";
+    // filename += "_tempArray.txt";
 
     // define the header information
     headerInformation = new String[numHeaderLines];
@@ -134,14 +138,21 @@ public:
     headerInformation[1] = "Station ID: ";
     headerInformation[1] += stationID;
 
-    headerInformation[2] = "Date, Time";
+    headerInformation[2] = "Sensor addresses: {";
+    headerInformation[2] += String(*addresses[0]);
+    for (int i=1;i<numSensors;i++){
+      headerInformation[2] += ", ";
+      headerInformation[2] += String(*addresses[i]);
+    }
+    headerInformation[2] += "}";
 
+    headerInformation[3] = "Date, Time";
     // for every sensor in the array
     for (int i=0; i<numSensors; i++) {
 
       // add a header column for each sensor
-      headerInformation[2] += ", Sensor ";
-      headerInformation[2] += i+1;
+      headerInformation[3] += ", Sensor ";
+      headerInformation[3] += i+1;
     }
 
     // shut down the sensors until we need them
@@ -237,48 +248,11 @@ void boardSetup() {
   digitalWrite(13, LOW);
   analogReadResolution(12);
 
-  // put the flash chip to sleep
+  // put the flash chip to sleep since we are using SD
   SerialFlash.begin(flashChipSelect);
   SerialFlash.sleep();
 
 }
-
-// /************ init_SD ************/
-// void init_SD(){
-//
-//   Serial.println("Made it here1");
-//
-//   delay(100);
-//   // set SS pins high for turning off radio
-//   pinMode(RADIO_PIN, OUTPUT);
-//   delay(50);
-//   digitalWrite(RADIO_PIN, HIGH);
-//   delay(50);
-//   pinMode(SD_CS, OUTPUT);
-//   delay(50);
-//   digitalWrite(SD_CS, LOW);
-//   delay(100);
-//   SD.begin(SD_CS);
-//   delay(200);
-//   if (!SD.begin(SD_CS)) {
-//     Serial.println("initialization failed!");
-//     while(1);
-//   }
-//   Serial.println("Made it here2");
-//   // pinMode(SD_CD, INPUT_PULLUP);
-//   // delay(50);
-//   // // if the SD card is out, hold until it's back in
-//   // Serial.println("Made it here3");
-//   // while(!SD_CD) {
-//   //   Serial.println("SD card not inserted...insert to continue");
-//   //   delay(500);
-//   //   Serial.print(".");
-//   //   delay(500);
-//   //   Serial.print(".");
-//   //   delay(500);
-//   //   Serial.println(".");
-//   // }
-// }
 
 /************ init_SD ************/
 void init_SD(){
@@ -299,6 +273,18 @@ void init_SD(){
     Serial.println("initialization failed!");
     while(1);
   }
+
+  //TODO: for some reason this causes program to hang, without ever entering this loop.
+  // // if the SD card is out, hold until it's back in
+  // while(!SD_CD) {
+  //   Serial.println("SD card not inserted...insert to continue");
+  //   delay(500);
+  //   Serial.print(".");
+  //   delay(500);
+  //   Serial.print(".");
+  //   delay(500);
+  //   Serial.println(".");
+  // }
 }
 
 
@@ -337,23 +323,14 @@ void alarm_one_routine() {
 
   // get a static temp sensors object. Should persist throughout program lifetime
   static TempSensors tempSensors_object = TempSensors(ONE_WIRE_BUS, TEMP_POWER, NUM_TEMP_SENSORS, STATION_ID);
+  static String filename = tempSensors_object.filename;
+
+  Serial.println("Made it past temp init");
 
   // init the SD
   init_SD();
 
   Serial.println("Made it past init_SD");
-
-  //TODO: for some reason this causes program to hang. in init_SD function.
-  // // if the SD card is out, hold until it's back in
-  // while(!SD_CD) {
-  //   Serial.println("SD card not inserted...insert to continue");
-  //   delay(500);
-  //   Serial.print(".");
-  //   delay(500);
-  //   Serial.print(".");
-  //   delay(500);
-  //   Serial.println(".");
-  // }
 
   // if the file doesn't already exist
   if (!SD.exists(filename)){
