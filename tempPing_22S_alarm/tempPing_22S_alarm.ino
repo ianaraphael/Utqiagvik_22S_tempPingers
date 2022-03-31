@@ -318,7 +318,7 @@ void alarm_one_routine() {
   // init the SD
   init_SD();
 
-  //TODO: for some reason this causes program to hang, without ever entering this loop.
+  // //TODO: for some reason this causes program to hang, without ever entering this loop.
   // // if the SD card is out, hold until it's back in
   // while(!SD_CD) {
   //   Serial.println("SD card not inserted...insert to continue");
