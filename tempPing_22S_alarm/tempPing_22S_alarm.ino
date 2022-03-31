@@ -419,7 +419,14 @@ void alarm_one_routine() {
 
     // close the file
     dataFile.close();
-    // TODO: include LED flash to indicate successful data write
+
+    // flash LED to indicate successful data write
+    for (int i=0;i<5;i++){
+      digitalWrite(13,HIGH);
+      delay(2000);
+      digitalWrite(13,LOW);
+      delay(500);
+    }
   }
 
 }
