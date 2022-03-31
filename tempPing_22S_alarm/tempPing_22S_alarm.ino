@@ -1,8 +1,8 @@
 /*
 
-tempPing_22S.ino
+tempPing_22S_alarm.ino
 
-Temperature and snow pinger datalogger for Utqiagvik April 2022 deployment.
+Temperature datalogger for Utqiagvik April 2022 deployment.
 
 Ian Raphael
 ian.th@dartmouth.edu
@@ -29,12 +29,7 @@ RTCZero rtc; // real time clock object
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
 #define NUM_TEMP_SENSORS 2 // number of sensors
-#define SAMPLING_INTERVAL_HOUR 0 // sampling interval, in hours
-#define SAMPLING_INTERVAL_MIN 1 // sampling interval, in mins. Set to 0 for even hourly sampling
-#define SAMPLING_INTERVAL_SEC 0 // sampling interval, in secs. Set to 0 for even minutely samplin
-// String filename = "test.txt"; // data file filename
-
-
+#define SAMPLING_SCHEME 0 // set to 0 for minutely sampling, 1 for hourly sampling
 
 /*************** TempSensors class ***************/
 // define a class for the temp sensors
@@ -299,9 +294,22 @@ bool init_RTC() {
 }
 
 void alarm_one() {
+
+  #define SAMPLING_INTERVAL_HOUR 0
+  #define SAMPLING_INTERVAL_MIN 0
+  #define SAMPLING_INTERVAL_SEC 0
   rtc.setAlarmTime(SAMPLING_INTERVAL_HOUR,SAMPLING_INTERVAL_MIN,SAMPLING_INTERVAL_SEC);
-  // rtc.enableAlarm(rtc.MATCH_MMSS);
-  rtc.enableAlarm(rtc.MATCH_SS);
+
+  // set sampling minutely or hourly
+  switch (SAMPLING_SCHEME){
+    case 0:
+    rtc.enableAlarm(rtc.MATCH_SS);
+    break;
+    case 1:
+    rtc.enableAlarm(rtc.MATCH_MMSS);
+    break;
+  }
+
   rtc.attachInterrupt(alarm_one_routine);
 }
 
