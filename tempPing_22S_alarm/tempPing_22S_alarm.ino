@@ -115,8 +115,9 @@ public:
         Serial.print("Couldn't find sensor at index ");
         Serial.println(Serial.print(i));
       }
-      // Serial.print("Sensor address: ");
+      Serial.print("Sensor address: ");
       // Serial.println(*addresses[i],HEX);
+      // printArr(addresses[i],8);
     }
 
     // now create the data filename
@@ -134,10 +135,10 @@ public:
     headerInformation[1] += stationID;
 
     headerInformation[2] = "Sensor addresses: {";
-    headerInformation[2] += String(*addresses[0]);
+    appendAddrToStr(addresses[0], &headerInformation[2]);
     for (int i=1;i<numSensors;i++){
       headerInformation[2] += ", ";
-      headerInformation[2] += String(*addresses[i]);
+      appendAddrToStr(addresses[i], &headerInformation[2]);
     }
     headerInformation[2] += "}";
 
@@ -179,8 +180,7 @@ public:
 
       // add its data to the string
       readString += ", ";
-      //TODO: fix to index through address object array
-      readString += this->sensors.getTempC(&addresses[i][0]);
+      readString += this->sensors.getTempC(addresses[i]);
     }
 
     // return the readstring. TODO: add timestamp to the string
@@ -192,6 +192,16 @@ public:
     for (int i=0; i<len; i++) {
       Serial.print(ptr[i], HEX);
       Serial.print(" ");
+    }
+  }
+
+  void appendAddrToStr(uint8_t *addrPtr, String *strPtr) {
+    for (int i=0; i<8; i++) {
+      *strPtr += "0x";
+      *strPtr += String(addrPtr[i],HEX);
+      if (i<7) {
+        *strPtr += " ";
+      }
     }
   }
 };
