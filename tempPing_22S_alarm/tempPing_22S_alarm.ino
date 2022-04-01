@@ -22,7 +22,7 @@ ian.th@dartmouth.edu
 const int flashChipSelect = 4;
 #define TEMP_POWER 6 // temp probe power line
 #define SD_CS 7 // SD card chip select
-// #define SD_CD 10 // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
+#define SD_CD 10 // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
 #define RADIO_PIN 5 // radio CS pin
 RTCZero rtc; // real time clock object
 
@@ -179,6 +179,7 @@ public:
 
       // add its data to the string
       readString += ", ";
+      //TODO: fix to index through address object array
       readString += this->sensors.getTempC(&addresses[i][0]);
     }
 
@@ -211,6 +212,9 @@ void setup() {
   // Start serial communications
   Serial.begin(9600);
   while (!Serial); // Wait for serial comms
+
+  // init the SD
+  init_SD();
 
   // init RTC
   init_RTC();
@@ -252,6 +256,8 @@ void boardSetup() {
 /************ init_SD ************/
 void init_SD(){
 
+Serial.println("init SD 1!");
+
   delay(100);
   // set SS pins high for turning off radio
   pinMode(RADIO_PIN, OUTPUT);
@@ -262,12 +268,15 @@ void init_SD(){
   delay(500);
   digitalWrite(SD_CS, LOW);
   delay(1000);
+  Serial.println("init SD 2!");
   SD.begin(SD_CS);
   delay(2000);
   if (!SD.begin(SD_CS)) {
     Serial.println("initialization failed!");
     while(1);
   }
+
+  // TODO: can we init the breakout board, leave it active...?
 }
 
 
@@ -323,11 +332,11 @@ void alarm_one_routine() {
 
   Serial.println("Made it past temp init");
 
-  // init the SD
-  init_SD();
+  // // init the SD
+  // init_SD();
 
   // //TODO: for some reason this causes program to hang, without ever entering this loop.
-  // // if the SD card is out, hold until it's back in
+  // if the SD card is out, hold until it's back in
   // while(!SD_CD) {
   //   Serial.println("SD card not inserted...insert to continue");
   //   delay(500);
@@ -414,7 +423,7 @@ void alarm_one_routine() {
   Serial.println(dataString);
 
   // init the sd card
-  init_SD();
+  // init_SD();
 
   // open the file for writing
   File dataFile = SD.open(tempSensors_object.filename, FILE_WRITE);
