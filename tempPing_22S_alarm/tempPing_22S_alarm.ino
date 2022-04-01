@@ -197,7 +197,7 @@ public:
 
   void appendAddrToStr(uint8_t *addrPtr, String *strPtr) {
     for (int i=0; i<8; i++) {
-      *strPtr += "0x";
+      // *strPtr += "0x";
       *strPtr += String(addrPtr[i],HEX);
       if (i<7) {
         *strPtr += " ";
@@ -341,9 +341,6 @@ void alarm_one_routine() {
   // static String filename = tempSensors_object.filename;
 
   Serial.println("Made it past temp init");
-
-  // // init the SD
-  // init_SD();
 
   // //TODO: for some reason this causes program to hang, without ever entering this loop.
   // if the SD card is out, hold until it's back in
