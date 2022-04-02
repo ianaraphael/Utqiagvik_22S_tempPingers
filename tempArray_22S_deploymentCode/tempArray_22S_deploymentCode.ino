@@ -1,20 +1,23 @@
 /*
 
-tempPing_22S_alarm.ino
+tempArray_22S_deploymentCode.ino
 
 Temperature datalogger for Utqiagvik April 2022 deployment.
 
 Ian Raphael
 ian.th@dartmouth.edu
-2022.03.28
+2022.04.02
 */
 
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
 #define NUM_TEMP_SENSORS 2 // number of sensors
-#define SAMPLING_SCHEME 0 // set to 0 for minutely sampling, 1 for hourly sampling
-//TODO: set 30 min alarms
+uint8_t SAMPLING_INTERVAL_HOUR = 0;// number of hours between samples
+uint8_t SAMPLING_INTERVAL_MIN = 0; // number of minutes between samples
+uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
+// #define SAMPLING_SCHEME 2 // set to 0 for minutely sampling, 1 for hourly sampling,
 
+/*************** packages ***************/
 #include <OneWire.h>
 #include <SerialFlash.h>
 #include <DallasTemperature.h>
@@ -22,6 +25,7 @@ ian.th@dartmouth.edu
 #include <RTCZero.h>
 #include <TimeLib.h>
 
+/*************** defines, macros, globals ***************/
 #define Serial SerialUSB
 
 #define ONE_WIRE_BUS 12 // temp probe data line
@@ -313,26 +317,77 @@ bool init_RTC() {
   }
 }
 
+/************ alarm_one ************/
+/*
+* Function to set RTC alarm
+*
+* TODO: at this point, we are incrementing all intervals at once. This is only
+* accurate as long as we are not doing a mixed definition sampling interval,
+* e.g. as long as we define our sampling interval as some number of minutes
+* ONLY (every 15 mins, e.g.), and not as some number of hours and minutes
+*
+* takes:
+* bool initFlag: indicates whether this is the initial instance of the alarm.
+* If it is, then the sample times as zero to sample first at the top of the interval
+*/
+// bool initFlag
 void alarm_one() {
 
-  #define SAMPLING_INTERVAL_HOUR 0
-  #define SAMPLING_INTERVAL_MIN 0
-  #define SAMPLING_INTERVAL_SEC 0
-  rtc.setAlarmTime(SAMPLING_INTERVAL_HOUR,SAMPLING_INTERVAL_MIN,SAMPLING_INTERVAL_SEC);
-
-  // set sampling minutely or hourly
-  switch (SAMPLING_SCHEME){
-    case 0:
-    rtc.enableAlarm(rtc.MATCH_SS);
-    break;
-    case 1:
-    rtc.enableAlarm(rtc.MATCH_MMSS);
-    break;
+  // if any of the intervals are defined as zero, redefine them as their max value
+  if (SAMPLING_INTERVAL_SEC == 0){
+    SAMPLING_INTERVAL_SEC = 60;
+  }
+  if (SAMPLING_INTERVAL_MIN == 0) {
+    SAMPLING_INTERVAL_MIN = 60;
+  }
+  if (SAMPLING_INTERVAL_HOUR == 0) {
+    SAMPLING_INTERVAL_HOUR = 24;
   }
 
+
+  static uint8_t sampleSecond;
+  static uint8_t sampleMinute;
+  static uint8_t sampleHour;
+  static uint8_t nSecSamples = 0;
+  static uint8_t nMinSamples = 0;
+  static uint8_t nHourSamples = 0;
+
+  // if our sample definitions are null, create them
+  // if (initFlag == TRUE){
+  // if (sampleSecond == NULL){
+  //   sampleSecond = 0;
+  //   sampleMinute = 0;
+  //   sampleHour = 0;
+  // } else {
+  //   // otherwise define the next sample to be taken. e.g. if we are sampling every 15
+  //   // seconds, and the next will be the second sample (n=1), then we will have:
+  //   // sampleSecond = (1*15)%60 = 15.
+  //   sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
+  //   sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
+  //   sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
+  // }
+
+  sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
+  sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
+  sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
+
+  // set the counter for the number of subinterval samples we've taken
+  nSecSamples = ((sampleSecond + SAMPLING_INTERVAL_SEC) % 60)/SAMPLING_INTERVAL_SEC;
+  nMinSamples = ((sampleMinute + SAMPLING_INTERVAL_MIN) % 60)/SAMPLING_INTERVAL_MIN;
+  nHourSamples = ((sampleHour + SAMPLING_INTERVAL_HOUR) % 24)/SAMPLING_INTERVAL_HOUR;
+
+  // then set the alarm and define the interrupt
+  rtc.setAlarmTime(sampleHour,sampleMinute,sampleSecond);
+  rtc.enableAlarm(rtc.MATCH_SS);
   rtc.attachInterrupt(alarm_one_routine);
 }
 
+
+/************ alarm_one_routine ************/
+/*
+* Routine to perform upon alarm_one interrupt. This is basically the main body
+* of the code
+*/
 void alarm_one_routine() {
 
   Serial.println("Made it to alarm routine");
@@ -453,6 +508,9 @@ void alarm_one_routine() {
       delay(500);
     }
   }
+
+  // schedule the next alarm
+  alarm_one();
 
 }
 
