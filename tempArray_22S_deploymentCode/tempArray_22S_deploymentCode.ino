@@ -15,7 +15,6 @@ ian.th@dartmouth.edu
 uint8_t SAMPLING_INTERVAL_HOUR = 0;// number of hours between samples
 uint8_t SAMPLING_INTERVAL_MIN = 0; // number of minutes between samples
 uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
-// #define SAMPLING_SCHEME 2 // set to 0 for minutely sampling, 1 for hourly sampling,
 
 /*************** packages ***************/
 #include <OneWire.h>
@@ -120,9 +119,6 @@ public:
         Serial.print("Couldn't find sensor at index ");
         Serial.println(Serial.print(i));
       }
-      Serial.print("Sensor address: ");
-      // Serial.println(*addresses[i],HEX);
-      // printArr(addresses[i],8);
     }
 
     // now create the data filename
@@ -193,12 +189,12 @@ public:
   }
 
   /************ print array ************/
-  void printArr(uint8_t *ptr, int len) {
-    for (int i=0; i<len; i++) {
-      Serial.print(ptr[i], HEX);
-      Serial.print(" ");
-    }
-  }
+  // void printArr(uint8_t *ptr, int len) {
+  //   for (int i=0; i<len; i++) {
+  //     Serial.print(ptr[i], HEX);
+  //     Serial.print(" ");
+  //   }
+  // }
 
   void appendAddrToStr(uint8_t *addrPtr, String *strPtr) {
     for (int i=0; i<8; i++) {
@@ -233,7 +229,19 @@ void setup() {
 
   // init RTC
   init_RTC();
-  alarm_one();
+  // alarm_one();
+
+  //
+  Serial.println("Board initialized successfully. Initial file creation and test data-write: ");
+  Serial.println("–––––––––––––––");
+  alarm_one_routine();
+  Serial.println("–––––––––––––––");
+  Serial.println("Subsequent data sampling will occur beginning on the 0th multiple of the sampling period.");
+  Serial.println("For example, if you are sampling every half hour, the next sample will occur at the top of the next hour, and subsequently every 30 minutes.");
+  Serial.println("If you are sampling every 30 seconds, the next sample will occur at the top of the next minute, and subsequently every 30 seconds.");
+  Serial.println("–––––––––––––––");
+  Serial.println("Have a great field deployment :)");
+  Serial.println("");
 }
 
 /************ main loop ************/
@@ -271,8 +279,6 @@ void boardSetup() {
 /************ init_SD ************/
 void init_SD(){
 
-Serial.println("init SD 1!");
-
   delay(100);
   // set SS pins high for turning off radio
   pinMode(RADIO_PIN, OUTPUT);
@@ -283,15 +289,12 @@ Serial.println("init SD 1!");
   delay(500);
   digitalWrite(SD_CS, LOW);
   delay(1000);
-  Serial.println("init SD 2!");
   SD.begin(SD_CS);
-  delay(2000);
+  delay(1000);
   if (!SD.begin(SD_CS)) {
     Serial.println("initialization failed!");
     while(1);
   }
-
-  // TODO: can we init the breakout board, leave it active...?
 }
 
 
@@ -390,13 +393,9 @@ void alarm_one() {
 */
 void alarm_one_routine() {
 
-  Serial.println("Made it to alarm routine");
-
   // get a static temp sensors object. Should persist throughout program lifetime
   static TempSensors tempSensors_object = TempSensors(ONE_WIRE_BUS, TEMP_POWER, NUM_TEMP_SENSORS, STATION_ID);
   // static String filename = tempSensors_object.filename;
-
-  Serial.println("Made it past temp init");
 
   // //TODO: for some reason this causes program to hang, without ever entering this loop.
   // if the SD card is out, hold until it's back in
@@ -409,8 +408,6 @@ void alarm_one_routine() {
   //   delay(500);
   //   Serial.println(".");
   // }
-
-  Serial.println("Made it past init_SD");
 
   // if the file doesn't already exist
   if (!SD.exists(tempSensors_object.filename)){
@@ -429,6 +426,9 @@ void alarm_one_routine() {
       for (int i=0;i<tempSensors_object.numHeaderLines;i++) {
 
         dataFile.println(tempSensors_object.headerInformation[i]);
+
+        // also print to serial to confirm
+        Serial.println(tempSensors_object.headerInformation[i]);
       }
 
       // close the file
@@ -459,8 +459,9 @@ void alarm_one_routine() {
   String timeString = "";
   int hours = rtc.getHours();
   int mins = rtc.getMinutes();
+  int secs = rtc.getSeconds();
 
-  // append hours and minutes to the timestamp, 0 padding if necessary
+  // append hours, mins, secs to the timestamp, 0 padding if necessary
   if (hours < 10) {
     timeString = String(0) + String(hours) + ":";
   } else {
@@ -468,19 +469,20 @@ void alarm_one_routine() {
   }
 
   if (mins < 10) {
-    timeString += String(0) + String(mins);
+    timeString += String(0) + String(mins) + ":";
   } else {
-    timeString += String(mins);
+    timeString += String(mins) + ":";
   }
+
+  if (secs < 10){
+    timeString += String(0) + String(secs);
+  } else {
+    timeString += String(secs);
+  }
+
 
   // read the data
   String dataString = tempSensors_object.readTempSensors(dateString,timeString);
-
-  // print the header information
-  for (int i=0;i<tempSensors_object.numHeaderLines;i++) {
-
-    Serial.println(tempSensors_object.headerInformation[i]);
-  }
 
   // test print the data
   Serial.println(dataString);
@@ -511,7 +513,6 @@ void alarm_one_routine() {
 
   // schedule the next alarm
   alarm_one();
-
 }
 
 
