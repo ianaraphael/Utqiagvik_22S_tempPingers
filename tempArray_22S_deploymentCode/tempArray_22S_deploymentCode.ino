@@ -11,7 +11,7 @@ ian.th@dartmouth.edu
 
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
-#define NUM_TEMP_SENSORS 2 // number of sensors
+#define NUM_TEMP_SENSORS 3 // number of sensors
 uint8_t SAMPLING_INTERVAL_HOUR = 0;// number of hours between samples
 uint8_t SAMPLING_INTERVAL_MIN = 0; // number of minutes between samples
 uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
@@ -27,11 +27,12 @@ uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
 /*************** defines, macros, globals ***************/
 #define Serial SerialUSB
 
-#define ONE_WIRE_BUS 12 // temp probe data line
+#define ONE_WIRE_BUS 7 // temp probe data line
 const int flashChipSelect = 4;
-#define TEMP_POWER 6 // temp probe power line
-#define SD_CS 7 // SD card chip select
-#define SD_CD 10 // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
+#define TEMP_POWER 8 // temp probe power line
+#define PARASITIC 1// parasitic power supply for temperature sensors
+#define SD_CS 10 // SD card chip select
+#define SD_CD NAN // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
 #define RADIO_PIN 5 // radio CS pin
 RTCZero rtc; // real time clock object
 
@@ -103,8 +104,10 @@ public:
     // // and point the object's addresses attribute here
     // addresses = curr_addresses;
 
-    pinMode(powerPin, OUTPUT);
-    digitalWrite(powerPin , HIGH);
+    if (!PARASITIC) {
+      pinMode(powerPin, OUTPUT);
+      digitalWrite(powerPin , HIGH);
+    }
 
     // init temp sensors themselves
     this->sensors.begin();
@@ -152,8 +155,10 @@ public:
       headerInformation[3] += i+1;
     }
 
-    // shut down the sensors until we need them
-    digitalWrite(powerPin , LOW);
+    if (!PARASITIC) {
+      // shut down the sensors until we need them
+      digitalWrite(powerPin , LOW);
+    }
   }
 
 
@@ -164,8 +169,11 @@ public:
   // TODO: wake/sleep the sensors in this function
   String readTempSensors(String date, String time) {
 
-    // write the power pin high
-    digitalWrite(powerPin, HIGH);
+    if (!PARASITIC) {
+      // write the power pin high
+      digitalWrite(powerPin, HIGH);
+      Serial.println("making it into power high");
+    }
 
     // Call sensors.requestTemperatures() to issue a global temperature request to all devices on the bus
     sensors.requestTemperatures();
@@ -182,6 +190,11 @@ public:
       // add its data to the string
       readString += ", ";
       readString += this->sensors.getTempC(addresses[i]);
+    }
+
+    if (!PARASITIC) {
+      // write the power pin high
+      digitalWrite(powerPin, LOW);
     }
 
     // return the readstring. TODO: add timestamp to the string
@@ -374,14 +387,27 @@ void alarm_one() {
   sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
   sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
 
-  // set the counter for the number of subinterval samples we've taken
+  // increment the counter for the number of subinterval samples we've taken
   nSecSamples = ((sampleSecond + SAMPLING_INTERVAL_SEC) % 60)/SAMPLING_INTERVAL_SEC;
   nMinSamples = ((sampleMinute + SAMPLING_INTERVAL_MIN) % 60)/SAMPLING_INTERVAL_MIN;
   nHourSamples = ((sampleHour + SAMPLING_INTERVAL_HOUR) % 24)/SAMPLING_INTERVAL_HOUR;
 
   // then set the alarm and define the interrupt
   rtc.setAlarmTime(sampleHour,sampleMinute,sampleSecond);
-  rtc.enableAlarm(rtc.MATCH_SS);
+
+  // if we're sampling at some nHour interval
+  if (SAMPLING_INTERVAL_HOUR != 24) {
+    rtc.enableAlarm(rtc.MATCH_HHMMSS);
+  }
+  // if we're sampling at some nMin interval
+  else if (SAMPLING_INTERVAL_MIN != 60) {
+    rtc.enableAlarm(rtc.MATCH_MMSS);
+  }
+  // if we're sampling at some nSec interval
+  else if (SAMPLING_INTERVAL_SEC != 60) {
+    rtc.enableAlarm(rtc.MATCH_SS);
+  }
+
   rtc.attachInterrupt(alarm_one_routine);
 }
 
@@ -505,7 +531,7 @@ void alarm_one_routine() {
     // flash LED to indicate successful data write
     for (int i=0;i<5;i++){
       digitalWrite(13,HIGH);
-      delay(2000);
+      delay(500);
       digitalWrite(13,LOW);
       delay(500);
     }
