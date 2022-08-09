@@ -369,23 +369,19 @@ void loop(void) {
     dataFile.close();
 
 
-    //   // flash LED to indicate successful data write
-    //   for (int i=0;i<5;i++){
-    //     digitalWrite(13,HIGH);
-    //     delay(500);
-    //     digitalWrite(13,LOW);
-    //     delay(500);
-    //   }
+      // flash LED to indicate successful data write
+      for (int i=0;i<5;i++){
+        digitalWrite(13,HIGH);
+        delay(500);
+        digitalWrite(13,LOW);
+        delay(500);
+      }
   }
-
-  pinMode(13,OUTPUT);
-  digitalWrite(13,!digitalRead(13));
 
   // schedule the next alarm
   alarm_one();
 
   if (Serial){
-    // Detach USB from host (not required if not in use)
     USBDevice.detach();
   }
 
@@ -416,7 +412,6 @@ void boardSetup() {
   // put the flash chip to sleep since we are using SD
   SerialFlash.begin(flashChipSelect);
   SerialFlash.sleep();
-
 }
 
 /************ init_SD ************/
@@ -544,17 +539,10 @@ void alarm_one() {
 
 /************ alarm_one_routine ************/
 /*
-* Routine to perform upon alarm_one interrupt. This is basically the main body
-* of the code
+* Dummy routine for alarm match. Nothing happens here, just kicks back to main
+* loop upon alarm
 */
 void alarm_one_routine() {
-  // pinMode(13,OUTPUT);
-  // for (int i=0;i<4;i++){
-  //   digitalWrite(13,HIGH);
-  //   delay(500);
-  //   digitalWrite(13,LOW);
-  // }
-
 }
 
 
