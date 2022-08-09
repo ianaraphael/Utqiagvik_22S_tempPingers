@@ -11,7 +11,7 @@ ian.th@dartmouth.edu
 
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
-#define NUM_TEMP_SENSORS 3 // number of sensors
+#define NUM_TEMP_SENSORS 2 // number of sensors
 uint8_t SAMPLING_INTERVAL_HOUR = 0;// number of hours between samples
 uint8_t SAMPLING_INTERVAL_MIN = 0; // number of minutes between samples
 uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
@@ -30,7 +30,7 @@ uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
 #define ONE_WIRE_BUS 7 // temp probe data line
 const int flashChipSelect = 4;
 #define TEMP_POWER 8 // temp probe power line
-#define PARASITIC 1// parasitic power supply for temperature sensors
+#define PARASITIC 0// parasitic power supply for temperature sensors
 #define SD_CS 10 // SD card chip select
 #define SD_CD NAN // SD card chip DETECT. Indicates presence/absence of SD card. High when card is inserted.
 #define RADIO_PIN 5 // radio CS pin
@@ -120,7 +120,7 @@ public:
 
         // print error
         Serial.print("Couldn't find sensor at index ");
-        Serial.println(Serial.print(i));
+        Serial.println(Serial.print(i),DEC);
       }
     }
 
@@ -172,7 +172,6 @@ public:
     if (!PARASITIC) {
       // write the power pin high
       digitalWrite(powerPin, HIGH);
-      Serial.println("making it into power high");
     }
 
     // Call sensors.requestTemperatures() to issue a global temperature request to all devices on the bus
@@ -193,7 +192,7 @@ public:
     }
 
     if (!PARASITIC) {
-      // write the power pin high
+      // write the power pin low
       digitalWrite(powerPin, LOW);
     }
 
@@ -242,12 +241,12 @@ void setup() {
 
   // init RTC
   init_RTC();
-  // alarm_one();
+  alarm_one();
 
   //
-  Serial.println("Board initialized successfully. Initial file creation and test data-write: ");
-  Serial.println("–––––––––––––––");
-  alarm_one_routine();
+  Serial.println("Board initialized successfully. Initial file creation and test data-write to follow.");
+  // Serial.println("–––––––––––––––");
+  // alarm_one_routine();
   Serial.println("–––––––––––––––");
   Serial.println("Subsequent data sampling will occur beginning on the 0th multiple of the sampling period.");
   Serial.println("For example, if you are sampling every half hour, the next sample will occur at the top of the next hour, and subsequently every 30 minutes.");
@@ -258,166 +257,8 @@ void setup() {
 }
 
 /************ main loop ************/
-void loop(void)
-{
-  // nothing happens here...check alarm_one_routine
-}
+void loop(void) {
 
-
-
-/************ Board setup ************/
-void boardSetup() {
-
-  unsigned char pinNumber;
-
-  // Pull up all unused pins to prevent floating vals
-  for (pinNumber = 0; pinNumber < 23; pinNumber++) {
-    pinMode(pinNumber, INPUT_PULLUP);
-  }
-  for (pinNumber = 32; pinNumber < 42; pinNumber++) {
-    pinMode(pinNumber, INPUT_PULLUP);
-  }
-  pinMode(25, INPUT_PULLUP);
-  pinMode(26, INPUT_PULLUP);
-  pinMode(13, OUTPUT);
-  digitalWrite(13, LOW);
-  analogReadResolution(12);
-
-  // put the flash chip to sleep since we are using SD
-  SerialFlash.begin(flashChipSelect);
-  SerialFlash.sleep();
-
-}
-
-/************ init_SD ************/
-void init_SD(){
-
-  delay(100);
-  // set SS pins high for turning off radio
-  pinMode(RADIO_PIN, OUTPUT);
-  delay(500);
-  digitalWrite(RADIO_PIN, HIGH);
-  delay(500);
-  pinMode(SD_CS, OUTPUT);
-  delay(500);
-  digitalWrite(SD_CS, LOW);
-  delay(1000);
-  SD.begin(SD_CS);
-  delay(1000);
-  if (!SD.begin(SD_CS)) {
-    Serial.println("initialization failed!");
-    while(1);
-  }
-}
-
-
-/************ init_RTC() ************/
-/*
-* Function to sync the RTC to compile-time timestamp
-*/
-bool init_RTC() {
-
-  // get the date and time the compiler was run
-  uint8_t dateArray[3];
-  uint8_t timeArray[3];
-
-  if(getDate(__DATE__,dateArray) && getTime(__TIME__,timeArray)){
-
-    rtc.begin();
-    rtc.setTime(timeArray[1], timeArray[2], timeArray[3]);
-    rtc.setDate(dateArray[3], dateArray[2], dateArray[1]);
-
-  } else { // if failed, hang
-    Serial.println("failed to init RTC");
-    while(1);
-  }
-}
-
-/************ alarm_one ************/
-/*
-* Function to set RTC alarm
-*
-* TODO: at this point, we are incrementing all intervals at once. This is only
-* accurate as long as we are not doing a mixed definition sampling interval,
-* e.g. as long as we define our sampling interval as some number of minutes
-* ONLY (every 15 mins, e.g.), and not as some number of hours and minutes
-*
-* takes:
-* bool initFlag: indicates whether this is the initial instance of the alarm.
-* If it is, then the sample times as zero to sample first at the top of the interval
-*/
-// bool initFlag
-void alarm_one() {
-
-  // if any of the intervals are defined as zero, redefine them as their max value
-  if (SAMPLING_INTERVAL_SEC == 0){
-    SAMPLING_INTERVAL_SEC = 60;
-  }
-  if (SAMPLING_INTERVAL_MIN == 0) {
-    SAMPLING_INTERVAL_MIN = 60;
-  }
-  if (SAMPLING_INTERVAL_HOUR == 0) {
-    SAMPLING_INTERVAL_HOUR = 24;
-  }
-
-
-  static uint8_t sampleSecond;
-  static uint8_t sampleMinute;
-  static uint8_t sampleHour;
-  static uint8_t nSecSamples = 0;
-  static uint8_t nMinSamples = 0;
-  static uint8_t nHourSamples = 0;
-
-  // if our sample definitions are null, create them
-  // if (initFlag == TRUE){
-  // if (sampleSecond == NULL){
-  //   sampleSecond = 0;
-  //   sampleMinute = 0;
-  //   sampleHour = 0;
-  // } else {
-  //   // otherwise define the next sample to be taken. e.g. if we are sampling every 15
-  //   // seconds, and the next will be the second sample (n=1), then we will have:
-  //   // sampleSecond = (1*15)%60 = 15.
-  //   sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
-  //   sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
-  //   sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
-  // }
-
-  sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
-  sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
-  sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
-
-  // increment the counter for the number of subinterval samples we've taken
-  nSecSamples = ((sampleSecond + SAMPLING_INTERVAL_SEC) % 60)/SAMPLING_INTERVAL_SEC;
-  nMinSamples = ((sampleMinute + SAMPLING_INTERVAL_MIN) % 60)/SAMPLING_INTERVAL_MIN;
-  nHourSamples = ((sampleHour + SAMPLING_INTERVAL_HOUR) % 24)/SAMPLING_INTERVAL_HOUR;
-
-  // then set the alarm and define the interrupt
-  rtc.setAlarmTime(sampleHour,sampleMinute,sampleSecond);
-
-  // if we're sampling at some nHour interval
-  if (SAMPLING_INTERVAL_HOUR != 24) {
-    rtc.enableAlarm(rtc.MATCH_HHMMSS);
-  }
-  // if we're sampling at some nMin interval
-  else if (SAMPLING_INTERVAL_MIN != 60) {
-    rtc.enableAlarm(rtc.MATCH_MMSS);
-  }
-  // if we're sampling at some nSec interval
-  else if (SAMPLING_INTERVAL_SEC != 60) {
-    rtc.enableAlarm(rtc.MATCH_SS);
-  }
-
-  rtc.attachInterrupt(alarm_one_routine);
-}
-
-
-/************ alarm_one_routine ************/
-/*
-* Routine to perform upon alarm_one interrupt. This is basically the main body
-* of the code
-*/
-void alarm_one_routine() {
 
   // get a static temp sensors object. Should persist throughout program lifetime
   static TempSensors tempSensors_object = TempSensors(ONE_WIRE_BUS, TEMP_POWER, NUM_TEMP_SENSORS, STATION_ID);
@@ -506,7 +347,6 @@ void alarm_one_routine() {
     timeString += String(secs);
   }
 
-
   // read the data
   String dataString = tempSensors_object.readTempSensors(dateString,timeString);
 
@@ -528,17 +368,193 @@ void alarm_one_routine() {
     // close the file
     dataFile.close();
 
-    // flash LED to indicate successful data write
-    for (int i=0;i<5;i++){
-      digitalWrite(13,HIGH);
-      delay(500);
-      digitalWrite(13,LOW);
-      delay(500);
-    }
+
+    //   // flash LED to indicate successful data write
+    //   for (int i=0;i<5;i++){
+    //     digitalWrite(13,HIGH);
+    //     delay(500);
+    //     digitalWrite(13,LOW);
+    //     delay(500);
+    //   }
   }
+
+  pinMode(13,OUTPUT);
+  digitalWrite(13,!digitalRead(13));
 
   // schedule the next alarm
   alarm_one();
+
+  if (Serial){
+    // Detach USB from host (not required if not in use)
+    USBDevice.detach();
+  }
+
+  // Sleep until next alarm match
+  rtc.standbyMode();
+}
+
+
+
+/************ Board setup ************/
+void boardSetup() {
+
+  unsigned char pinNumber;
+
+  // Pull up all unused pins to prevent floating vals
+  for (pinNumber = 0; pinNumber < 23; pinNumber++) {
+    pinMode(pinNumber, INPUT_PULLUP);
+  }
+  for (pinNumber = 32; pinNumber < 42; pinNumber++) {
+    pinMode(pinNumber, INPUT_PULLUP);
+  }
+  pinMode(25, INPUT_PULLUP);
+  pinMode(26, INPUT_PULLUP);
+  pinMode(13, OUTPUT);
+  digitalWrite(13, LOW);
+  analogReadResolution(12);
+
+  // put the flash chip to sleep since we are using SD
+  SerialFlash.begin(flashChipSelect);
+  SerialFlash.sleep();
+
+}
+
+/************ init_SD ************/
+void init_SD(){
+
+  delay(100);
+  // set SS pins high for turning off radio
+  pinMode(RADIO_PIN, OUTPUT);
+  delay(500);
+  digitalWrite(RADIO_PIN, HIGH);
+  delay(500);
+  pinMode(SD_CS, OUTPUT);
+  delay(500);
+  digitalWrite(SD_CS, LOW);
+  delay(1000);
+  SD.begin(SD_CS);
+  delay(1000);
+  if (!SD.begin(SD_CS)) {
+    Serial.println("SD initialization failed!");
+    while(1);
+  }
+}
+
+
+/************ init_RTC() ************/
+/*
+* Function to sync the RTC to compile-time timestamp
+*/
+bool init_RTC() {
+
+  // get the date and time the compiler was run
+  uint8_t dateArray[3];
+  uint8_t timeArray[3];
+
+  if(getDate(__DATE__,dateArray) && getTime(__TIME__,timeArray)){
+
+    rtc.begin();
+    rtc.setTime(timeArray[1], timeArray[2], timeArray[3]);
+    rtc.setDate(dateArray[3], dateArray[2], dateArray[1]);
+
+  } else { // if failed, hang
+    Serial.println("failed to init RTC");
+    while(1);
+  }
+}
+
+/************ alarm_one ************/
+/*
+* Function to set RTC alarm
+*
+* TODO: at this point, we are incrementing all intervals at once. This is only
+* accurate as long as we are not doing a mixed definition sampling interval,
+* e.g. as long as we define our sampling interval as some number of minutes
+* ONLY (every 15 mins, e.g.), and not as some number of hours and minutes
+*
+* takes:
+* bool initFlag: indicates whether this is the initial instance of the alarm.
+* If it is, then set the sample times as zero to sample first at the top of the interval
+*/
+// bool initFlag
+void alarm_one() {
+
+  // if any of the intervals are defined as zero, redefine them as their max value
+  if (SAMPLING_INTERVAL_SEC == 0){
+    SAMPLING_INTERVAL_SEC = 60;
+  }
+  if (SAMPLING_INTERVAL_MIN == 0) {
+    SAMPLING_INTERVAL_MIN = 60;
+  }
+  if (SAMPLING_INTERVAL_HOUR == 0) {
+    SAMPLING_INTERVAL_HOUR = 24;
+  }
+
+
+  static uint8_t sampleSecond;
+  static uint8_t sampleMinute;
+  static uint8_t sampleHour;
+  static uint8_t nSecSamples = 0;
+  static uint8_t nMinSamples = 0;
+  static uint8_t nHourSamples = 0;
+
+  // if our sample definitions are null, create them
+  // if (initFlag == TRUE){
+  // if (sampleSecond == NULL){
+  //   sampleSecond = 0;
+  //   sampleMinute = 0;
+  //   sampleHour = 0;
+  // } else {
+  //   // otherwise define the next sample to be taken. e.g. if we are sampling every 15
+  //   // seconds, and the next will be the second sample (n=1), then we will have:
+  //   // sampleSecond = (1*15)%60 = 15.
+  //   sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
+  //   sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
+  //   sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
+  // }
+
+  sampleSecond = (nSecSamples * SAMPLING_INTERVAL_SEC) % 60;
+  sampleMinute = (nMinSamples * SAMPLING_INTERVAL_MIN) % 60;
+  sampleHour = (nHourSamples * SAMPLING_INTERVAL_HOUR) % 24;
+
+  // increment the counter for the number of subinterval samples we've taken
+  nSecSamples = ((sampleSecond + SAMPLING_INTERVAL_SEC) % 60)/SAMPLING_INTERVAL_SEC;
+  nMinSamples = ((sampleMinute + SAMPLING_INTERVAL_MIN) % 60)/SAMPLING_INTERVAL_MIN;
+  nHourSamples = ((sampleHour + SAMPLING_INTERVAL_HOUR) % 24)/SAMPLING_INTERVAL_HOUR;
+
+  // then set the alarm and define the interrupt
+  rtc.setAlarmTime(sampleHour,sampleMinute,sampleSecond);
+
+  // if we're sampling at some nHour interval
+  if (SAMPLING_INTERVAL_HOUR != 24) {
+    rtc.enableAlarm(rtc.MATCH_HHMMSS);
+  }
+  // if we're sampling at some nMin interval
+  else if (SAMPLING_INTERVAL_MIN != 60) {
+    rtc.enableAlarm(rtc.MATCH_MMSS);
+  }
+  // if we're sampling at some nSec interval
+  else if (SAMPLING_INTERVAL_SEC != 60) {
+    rtc.enableAlarm(rtc.MATCH_SS);
+  }
+
+  rtc.attachInterrupt(alarm_one_routine);
+}
+
+
+/************ alarm_one_routine ************/
+/*
+* Routine to perform upon alarm_one interrupt. This is basically the main body
+* of the code
+*/
+void alarm_one_routine() {
+  // pinMode(13,OUTPUT);
+  // for (int i=0;i<4;i++){
+  //   digitalWrite(13,HIGH);
+  //   delay(500);
+  //   digitalWrite(13,LOW);
+  // }
+
 }
 
 
