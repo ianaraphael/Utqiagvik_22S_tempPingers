@@ -11,7 +11,7 @@ ian.th@dartmouth.edu
 
 /***************!! Station settings !!***************/
 #define STATION_ID 1 // station ID
-#define NUM_TEMP_SENSORS 2 // number of sensors
+#define NUM_TEMP_SENSORS 1 // number of sensors
 uint8_t SAMPLING_INTERVAL_HOUR = 0;// number of hours between samples
 uint8_t SAMPLING_INTERVAL_MIN = 0; // number of minutes between samples
 uint8_t SAMPLING_INTERVAL_SEC = 15; // number of seconds between samples
