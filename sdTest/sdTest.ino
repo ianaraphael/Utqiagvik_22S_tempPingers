@@ -1,5 +1,6 @@
 #include <SD.h>
- 
+
+#define Serial SerialUSB
 File myFile;
  
 void setup()
